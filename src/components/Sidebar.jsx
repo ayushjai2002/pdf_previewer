@@ -7,7 +7,7 @@ const TAG_TYPE = 'TAG';
 const Tag = ({ label }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: TAG_TYPE,
-    item: { label },
+    item: { label, isNew: true },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),

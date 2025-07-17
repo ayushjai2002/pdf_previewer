@@ -34,41 +34,68 @@ const PdfViewer = () => {
     );
   };
 
-  const onDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
-  };
-
   const handleTagDrop = (tag) => {
     setDroppedTags((prev) => [...prev, tag]);
   };
 
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages);
+  };
+
+  const handleSave = () => {
+    console.log('✅ Saved Tags:', droppedTags);
+    alert('✅ Changes have been saved!');
+    // You can also save to backend/localStorage here
+    // localStorage.setItem('pdf-tags', JSON.stringify(droppedTags));
+  };
+
   return (
     <div style={{ flex: 1, padding: '20px', overflow: 'auto' }}>
-      <h2>Upload and View PDF</h2>
+      <h2>📄 Upload and View PDF</h2>
       <input type="file" accept="application/pdf" onChange={onFileChange} />
-      <div style={{ marginTop: '20px' }}>
-        {fileUrl && (
-          <Document
-            file={fileUrl}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={(error) => {
-              console.error('Failed to load PDF:', error);
-              setFileUrl(null);
-            }}
-          >
-            {Array.from({ length: numPages }, (_, i) => (
-              <PDFPage
-                key={i+1}
-                pageNumber={i+1}  // ✅ ensure page numbers start from 1
-                droppedTags={droppedTags.filter((tag) => tag.pageNumber === i+1)}
-                onTagDrop={handleTagDrop}
-                onTagMove={handleTagMove}
-                activeTagLabel={activeTagLabel}
-              />
-            ))}
-          </Document>
-        )}
-      </div>
+      
+      {fileUrl && (
+        <>
+          <div style={{ marginTop: '20px' }}>
+            <Document
+              file={fileUrl}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={(error) => {
+                console.error('Failed to load PDF:', error);
+                setFileUrl(null);
+              }}
+            >
+              {Array.from({ length: numPages }, (_, i) => (
+                <PDFPage
+                  key={i + 1}
+                  pageNumber={i + 1}
+                  droppedTags={droppedTags.filter((tag) => tag.pageNumber === i + 1)}
+                  onTagDrop={handleTagDrop}
+                  onTagMove={handleTagMove}
+                  activeTagLabel={activeTagLabel}
+                />
+              ))}
+            </Document>
+          </div>
+
+          <div style={{ marginTop: '30px', textAlign: 'center' }}>
+            <button
+              onClick={handleSave}
+              style={{
+                padding: '12px 24px',
+                fontSize: '16px',
+                backgroundColor: '#4CAF50',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+              }}
+            >
+              💾 Save Changes
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };

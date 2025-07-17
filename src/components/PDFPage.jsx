@@ -1,31 +1,70 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Page } from 'react-pdf';
-import { useDrop } from 'react-dnd';
-import Draggable from 'react-draggable';
+import { useDrop, useDrag, useDragLayer } from 'react-dnd';
 import { TAG_TYPE } from './Sidebar';
+
+// Tag component with real-time movement
+const Tag = ({ tag, onTagMove, containerRef }) => {
+  const [{ isDragging }, drag] = useDrag({
+    type: TAG_TYPE,
+    item: { id: tag.id, label: tag.label, x: tag.x, y: tag.y, pageNumber: tag.pageNumber },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  const { currentOffset, isDragging: isDragLayerActive, item } = useDragLayer((monitor) => ({
+    currentOffset: monitor.getClientOffset(),
+    isDragging: monitor.isDragging(),
+    item: monitor.getItem(),
+  }));
+
+  useEffect(() => {
+    if (
+      isDragLayerActive &&
+      item?.id === tag.id &&
+      currentOffset &&
+      containerRef.current
+    ) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const newX = currentOffset.x - rect.left - 30;
+      const newY = currentOffset.y - rect.top - 12;
+
+      const clampedX = Math.max(0, Math.min(newX, rect.width - 60));
+      const clampedY = Math.max(0, Math.min(newY, rect.height - 24));
+
+      // Real-time move
+      onTagMove(tag.id, clampedX, clampedY, tag.pageNumber);
+    }
+  }, [currentOffset, isDragLayerActive]);
+
+  return (
+    <div
+      ref={drag}
+      style={{
+        position: 'absolute',
+        left: tag.x,
+        top: tag.y,
+        opacity: isDragging ? 0.5 : 1,
+        backgroundColor: 'rgba(255,255,0,0.85)',
+        padding: '4px 8px',
+        borderRadius: '4px',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        cursor: 'move',
+        userSelect: 'none',
+        zIndex: 10,
+      }}
+    >
+      {tag.label}
+    </div>
+  );
+};
 
 const PDFPage = ({ pageNumber, droppedTags, onTagDrop, onTagMove }) => {
   const containerRef = useRef(null);
-  const [containerRect, setContainerRect] = useState(null);
 
-  useEffect(() => {
-    const updateRect = () => {
-      if (containerRef.current) {
-        setContainerRect(containerRef.current.getBoundingClientRect());
-      }
-    };
-
-    // Wait a moment after mount for layout stabilization
-    const timeout = setTimeout(updateRect, 300);
-    window.addEventListener('resize', updateRect);
-
-    return () => {
-      clearTimeout(timeout);
-      window.removeEventListener('resize', updateRect);
-    };
-  }, []);
-
-  const [{ isOver }, drop] = useDrop(() => ({
+  const [, drop] = useDrop(() => ({
     accept: TAG_TYPE,
     drop: (item, monitor) => {
       const clientOffset = monitor.getClientOffset();
@@ -33,36 +72,27 @@ const PDFPage = ({ pageNumber, droppedTags, onTagDrop, onTagMove }) => {
 
       if (!clientOffset || !rect) return;
 
-      // ✅ Only drop if the mouse is inside this page
-      if (
-        clientOffset.y < rect.top ||
-        clientOffset.y > rect.bottom
-      ) {
-        return;
-      }
-
-      const x = clientOffset.x - rect.left - 30; // adjust tag center
+      const x = clientOffset.x - rect.left - 30;
       const y = clientOffset.y - rect.top - 12;
 
       const clampedX = Math.max(0, Math.min(x, rect.width - 60));
       const clampedY = Math.max(0, Math.min(y, rect.height - 24));
 
-      onTagDrop({
-        id: Date.now(),
-        label: item.label,
-        x: clampedX,
-        y: clampedY,
-        pageNumber,
-      });
+      if (item.isNew) {
+        onTagDrop({
+          id: Date.now(),
+          label: item.label,
+          x: clampedX,
+          y: clampedY,
+          pageNumber,
+        });
+      }
     },
-    collect: (monitor) => ({
-      isOver: monitor.isOver({ shallow: true }),
-    }),
   }));
 
-  const handleDrag = (e, data, tagId) => {
-    onTagMove(tagId, data.x, data.y, pageNumber);
-  };
+  useEffect(() => {
+    console.log('Rendered Page:', pageNumber);
+  }, [pageNumber]);
 
   return (
     <div
@@ -73,36 +103,27 @@ const PDFPage = ({ pageNumber, droppedTags, onTagDrop, onTagMove }) => {
       style={{
         position: 'relative',
         marginBottom: '20px',
-        border: isOver ? '2px dashed #007bff' : 'none',
         width: 800,
+        border: '1px solid #ccc',
       }}
     >
-      <Page key={`page_${pageNumber}`} pageNumber={pageNumber} width={800} renderAnnotationLayer={false} />
+      <Page
+        key={`page_${pageNumber}`}
+        pageNumber={pageNumber}
+        width={800}
+        renderAnnotationLayer={false}
+      />
 
-      {droppedTags.map((tag) => (
-        <Draggable
-          key={tag.id}
-          position={{ x: tag.x, y: tag.y }}
-          bounds="parent"
-          onStop={(e, data) => handleDrag(e, data, tag.id)}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              backgroundColor: 'rgba(255,255,0,0.85)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              cursor: 'move',
-              userSelect: 'none',
-              zIndex: 10,
-            }}
-          >
-            {tag.label}
-          </div>
-        </Draggable>
-      ))}
+      {droppedTags.map((tag) =>
+        tag.pageNumber === pageNumber ? (
+          <Tag
+            key={tag.id}
+            tag={tag}
+            onTagMove={onTagMove}
+            containerRef={containerRef}
+          />
+        ) : null
+      )}
     </div>
   );
 };
